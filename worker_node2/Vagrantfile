@@ -1,0 +1,45 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+    config.vm.box = "bento/ubuntu-18.04"
+    config.vm.network "private_network", ip: "172.16.1.173"
+
+    config.vm.provider "virtualbox" do |vb|
+        vb.gui = true
+        vb.memory = "512"
+
+        vb.customize [
+            "modifyvm", :id,
+            "--vram", "64", 
+            "--clipboard", "bidirectional", 
+            "--draganddrop", "bidirectional",
+            "--cpus", "1",
+            "--ioapic", "on"
+        ]
+    end
+
+    # Intall Networking command
+    config.vm.provision "shell", privileged: true, inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install -y bridge-utils
+    SHELL
+
+    # Install Docker
+    config.vm.provision "shell", privileged: true, inline: <<-SHELL
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        sudo usermod -aG docker vagrant
+    SHELL
+
+    # Install Docker-compose
+    config.vm.provision "shell", privileged: true, inline: <<-SHELL
+        sudo apt-get install -y python3-pip
+        sudo curl -L "https://github.com/docker/compose/releases/download/1.26.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+    SHELL
+
+end
+
+# Login: vagrant vagrant
