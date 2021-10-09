@@ -261,3 +261,61 @@ $ docker run -it --name client01 -h client01 --network mynet01 --ip 11.0.0.8 cen
         </body>
 </html>
 ```
+
+## Macvlan の場合
+
+ついでなので Macvlan (p. 217 -) の方も試したけどできなかった。以下、一応やった手順を残す。  
+IP セグメントやネットワークアダプタは微妙に書籍と異なる。  
+なお、 Macvlan は Linux Kernel 3.9+ の Docker で動作する。  
+
+- [Networking using a macvlan network | Docker Documentation](https://docs.docker.com/network/network-tutorial-macvlan/)
+
+こことかが参考なりそう。
+
+- [networking - Is it possible to attach Docker containers inside Ubuntu Virtualbox to phyical network via macvlan? - Super User](https://superuser.com/questions/1343250/is-it-possible-to-attach-docker-containers-inside-ubuntu-virtualbox-to-phyical-n)
+
+### ネットワーク作成
+
+Manager node で、
+
+```sh
+docker swarm leave -f
+docker system prune
+```
+
+してから、
+
+```sh
+docker network create -d macvlan -o parent=eth1 --subnet 172.16.1.0/24 --gateway 172.16.1.160 --ip-range=172.16.1.0/16 --aux-address 'manager=172.16.1.171' --aux-address 'worker1=172.16.1.172' flatnet01
+```
+
+で Macvlan のネットワークを作る。なお、ホストのゲートウェイは `Vagrantfile` で設定した。
+worker node1でも、
+
+```sh
+docker swarm leave
+docker system prune
+docker network create -d macvlan -o parent=eth1 --subnet 172.16.1.0/24 --gateway 172.16.1.160 --ip-range=172.16.1.0/16 --aux-address 'manager=172.16.1.171' --aux-address 'worker1=172.16.1.172' flatnet01
+```
+
+## コンテナ起動
+
+manager node で、
+
+```sh
+docker container run --net=flatnet01 --ip=172.16.1.1 --name websvr-flat01 -h websvr-flat01 larsks/thttpd
+```
+
+でサーバーを起動。  
+worker node でまずホスト上かアクセスしてみる。
+
+```sh
+curl http://172.16.1.1
+```
+
+次に CentOS のコンテナを作ってアクセス。
+
+```sh
+docker run --net=flatnet01 --ip=172.16.1.2 -itd --name c610-flat01 -h c610-flat01 centos:6.10 /bin/bash
+docker container exec -it c610-flat01 curl http://172.16.1.1
+```
